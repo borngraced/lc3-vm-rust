@@ -1,0 +1,8 @@
+[package]
+name = "lvm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ctrlc = "3.5.1"
+nix = { version = "^0.30", features = ["poll", "event"] }
