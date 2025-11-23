@@ -56,21 +56,20 @@ pub fn trap(svm: &mut Svm) -> TrapCode {
                 let word = (word & 0xFF) as u8;
 
                 print!("{}", word as char);
-                stdout().flush().unwrap();
-
                 addr += 1;
             }
+
             stdout().flush().unwrap();
         }
         TrapCode::IN => {
             print!("Enter a character: ");
+            stdout().flush().unwrap();
             let byte = stdin()
                 .bytes()
                 .next()
                 .and_then(|r| r.ok())
                 .expect("unable to read character");
             print!("{}", byte as char);
-
             stdout().flush().unwrap();
 
             svm.reg[Register::R_R0.as_usize()] = byte as u16;

@@ -5,4 +5,4 @@ A virtual machine implementation for the LC-3 ISA, written in rust. This VM can 
 [Write your Own Virtual Machine](https://www.jmeiners.com/lc3-vm/)
 
 ### Running
-cargo run -- assets/reverse-a-string.obj
+cargo run -- assets/2048.obj

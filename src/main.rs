@@ -32,12 +32,8 @@ use std::{
 
 const ORIGIN_MAX: usize = 2;
 const MEMORY_MAX: usize = 1 << 16;
-
-#[derive(Debug, Eq, PartialEq)]
-enum MMR {
-    MR_KBSR = 0xFE00, /* keyboard status */
-    MR_KBDR = 0xFE02, /* keyboard data */
-}
+const MR_KBSR: usize = 0xFE00;
+const MR_KBDR: usize = 0xFE02;
 
 #[derive(Debug, Eq, PartialEq)]
 enum Register {
@@ -139,7 +135,7 @@ impl From<usize> for OpCode {
 enum ConditionFlag {
     FL_POS = 1 << 0,
     FL_ZRO = 1 << 1,
-    FL_NEG = 1 << 3,
+    FL_NEG = 1 << 2,
 }
 
 fn swap16(v: u16) -> u16 {
@@ -179,11 +175,11 @@ struct Svm {
 impl Svm {
     fn new(image_path: PathBuf) -> Self {
         let mut reg = vec![0u16; 12];
-        reg[Register::R_COND as usize] = ConditionFlag::FL_ZRO as u16;
+        reg[Register::R_COND.as_usize()] = ConditionFlag::FL_ZRO as u16;
 
         // set the pc to starting position 0x3000 is default;
-        const PC_START: usize = 0x3000;
-        reg[Register::R_PC.as_usize()] = PC_START as u16;
+        const PC_START: u16 = 0x3000;
+        reg[Register::R_PC.as_usize()] = PC_START;
 
         Self {
             reg,
@@ -220,21 +216,19 @@ impl Svm {
     }
 
     pub fn mem_read(&mut self, addr: usize) -> u16 {
-        if addr == MMR::MR_KBSR as usize {
+        if addr == MR_KBSR {
             if check_key() {
-                self.mem[MMR::MR_KBSR as usize] = 1 << 15;
-                self.mem[MMR::MR_KBDR as usize] = stdin()
+                self.mem[MR_KBSR] = 1 << 15;
+                self.mem[MR_KBDR] = stdin()
                     .bytes()
                     .next()
                     .and_then(|r| r.ok())
-                    .expect("unable to read byte")
-                    as u16;
+                    .expect("unable to read byte") as u16;
             } else {
-                self.mem[MMR::MR_KBSR as usize] = 0;
+                self.mem[MR_KBSR] = 0;
             }
-        } else if addr == MMR::MR_KBDR as usize {
-            self.mem[MMR::MR_KBSR as usize] = 0;
         }
+
         self.mem[addr]
     }
 
