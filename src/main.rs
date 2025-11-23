@@ -3,7 +3,7 @@ mod instructions;
 mod trap;
 
 use nix::{
-    libc::{self, ECHO, ICANON, TCSANOW, tcgetattr, tcsetattr, termios},
+    libc::{self, ECHO, EXIT_FAILURE, ICANON, TCSANOW, tcgetattr, tcsetattr, termios},
     sys::{
         select::{FdSet, select},
         time::{TimeVal, TimeValLike},
@@ -26,12 +26,14 @@ use std::{
     io::{Read, Write, stdin, stdout},
     os::fd::BorrowedFd,
     path::PathBuf,
+    process::exit,
     thread::sleep,
     time::Duration,
 };
 
 const ORIGIN_MAX: usize = 2;
 const MEMORY_MAX: usize = 1 << 16;
+const REGISTER_MAX: usize = 12;
 const MR_KBSR: usize = 0xFE00;
 const MR_KBDR: usize = 0xFE02;
 
@@ -105,7 +107,6 @@ enum OpCode {
     OP_RES,  // reserved unused
     OP_LEA,  // load effective address
     OP_TRAP, // execute trap
-    OP_BAD,
 }
 
 impl From<usize> for OpCode {
@@ -127,7 +128,7 @@ impl From<usize> for OpCode {
             13 => Self::OP_RES,
             14 => Self::OP_LEA,
             15 => Self::OP_TRAP,
-            _ => Self::OP_BAD,
+            _ => panic!("invalid opcode {value}"),
         }
     }
 }
@@ -166,15 +167,17 @@ fn check_key() -> bool {
 }
 
 struct Svm {
-    reg: Vec<u16>,
-    mem: Vec<u16>,
+    reg: [u16; REGISTER_MAX],
+    mem: [u16; MEMORY_MAX],
     image_path: PathBuf,
     current_instr: Option<u16>,
 }
 
 impl Svm {
     fn new(image_path: PathBuf) -> Self {
-        let mut reg = vec![0u16; 12];
+        let mem = [0u16; MEMORY_MAX];
+        let mut reg = [0u16; REGISTER_MAX];
+
         reg[Register::R_COND.as_usize()] = ConditionFlag::FL_ZRO as u16;
 
         // set the pc to starting position 0x3000 is default;
@@ -183,7 +186,7 @@ impl Svm {
 
         Self {
             reg,
-            mem: vec![0u16; MEMORY_MAX],
+            mem,
             image_path,
             current_instr: None,
         }
@@ -204,7 +207,7 @@ impl Svm {
         for (i, chunk) in words.chunks_exact(2).enumerate() {
             let addr_val = swap16(u16::from_le_bytes(chunk.try_into().unwrap()));
             let idx = origin as usize + i;
-            self.mem[idx] = addr_val;
+            self.mem_write(idx, addr_val);
         }
 
         println!(
@@ -347,6 +350,7 @@ impl Svm {
         let instr = StiInstruction::new(self.current_instr());
         let addr = self
             .mem_read((self.reg[Register::R_PC.as_usize()].wrapping_add(instr.pc_offset)) as usize);
+
         self.mem_write(addr as usize, self.reg[instr.source_register.as_usize()]);
     }
 
@@ -422,9 +426,10 @@ pub fn restore_input_buffering() {
 fn handle_signal_interrupt() {}
 
 fn main() {
-    // ctrlc::set_handler(move || {
-    //     restore_input_buffering();
-    // });
+    ctrlc::set_handler(move || {
+        restore_input_buffering();
+        exit(EXIT_FAILURE)
+    });
 
     disable_input_buffering();
 
@@ -460,7 +465,6 @@ fn main() {
             OpCode::OP_NOT => svm.not(),
             OpCode::OP_JMP => svm.jmp(),
             OpCode::OP_JSR => svm.jsr(),
-
             OpCode::OP_TRAP => {
                 if let TrapCode::HALT = trap(&mut svm) {
                     break;

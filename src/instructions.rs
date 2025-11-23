@@ -16,10 +16,6 @@ pub struct AddAndInstruction {
 }
 
 impl AddAndInstruction {
-    fn read(address: u16) -> Self {
-        unimplemented!()
-    }
-
     pub fn new(instruction: u16) -> Self {
         let destination_register = Register::from(((instruction >> 9) & 0x7) as u8);
         let source_register_1 = Register::from(((instruction >> 6) & 0x7) as u8);
