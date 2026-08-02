@@ -12,9 +12,9 @@ use nix::{
 
 use crate::{
     instructions::{
-        AddAndInstruction, AddressingMode, JsrInstruction, LdInstruction, LdiInstruction,
-        LdrInstruction, LeaInstruction, NotInstruction, StInstruction, StiInstruction,
-        StrInstruction,
+        AddAndInstruction, AddressingMode, BrInstr, JmpInstr, JsrInstruction, LdInstruction,
+        LdiInstruction, LdrInstruction, LeaInstruction, NotInstruction, StInstruction,
+        StiInstruction, StrInstruction,
     },
     trap::{TrapCode, trap},
 };
@@ -300,10 +300,10 @@ impl Svm {
     }
 
     fn br(&mut self) {
-        let instr = self.current_instr();
-        let pc_offset = sign_extend(instr & 0x1FF, 9);
+        let decoded = BrInstr::from_raw(self.current_instr());
+        let pc_offset = sign_extend(decoded.pc_offset(), 9);
 
-        let npz = (instr >> 9) & 0b111;
+        let npz = decoded.nzp();
 
         if npz & self.reg[Register::R_COND.as_usize()] != 0 {
             self.reg[Register::R_PC.as_usize()] =
@@ -381,7 +381,8 @@ impl Svm {
     }
 
     fn jmp(&mut self) {
-        let base_register = ((self.current_instr() >> 6) & 0x7) as usize;
+        let decoded = JmpInstr::from_raw(self.current_instr());
+        let base_register = decoded.baser() as usize;
         if base_register == Register::R_R7.as_usize() {
             self.reg[Register::R_PC.as_usize()] = self.reg[Register::R_R7.as_usize()];
             return;

@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 ctrlc = "3.5.1"
 nix = { version = "^0.30", features = ["poll", "event"] }
+packed_bits = "0.3.0"
